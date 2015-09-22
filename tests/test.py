@@ -19,6 +19,7 @@ import ctypes
 import os
 import tempfile
 import unittest
+import gc
 
 import gccjit
 
@@ -217,6 +218,18 @@ class ErrorTests(unittest.TestCase):
         self.assertEqual(cm.exception.msg,
                          (b'gcc_jit_function_new_block:'
                           b' cannot add block to an imported function'))
+
+    # Verify that objects become invalid after Context is released.
+    def test_object_invalidation(self):
+        ctxt = gccjit.Context()
+        int_type = ctxt.get_type(gccjit.TypeKind.INT)
+        self.assertEqual(str(int_type), 'int')
+        del ctxt
+        gc.collect()
+        self.assertEqual(str(int_type), 'NULL')
+        with self.assertRaises(gccjit.Error) as cm:
+            int_type.get_const()
+        self.assertEqual(cm.exception.msg, b'parent context was destroyed')
 
 if __name__ == '__main__':
     unittest.main()
